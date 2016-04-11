@@ -1,0 +1,2776 @@
+---
+title: "clusters"
+author: "Andrea Tellería"
+date: "April 10, 2016"
+output: pdf_document
+---
+
+# Objetivo:
+
+Realizar un análisis en dónde se escoja, en base a conocimientos adquiridos en clase, el mejor algoritmo de clustering para los distintos set de datos ofrecidos por el grupo docente de Minería de Datos. Utilizando para esto, los algoritmos de K-Medias y el Clustering Jerárquico.
+
+# Análisis:
+
+## 1. Librerías Necesarias
+
+Primero que nada es necesario que se cuentes con ciertas librerías, las cuales fueron usadas a la hora de realizar el estudio, estas librerías, más que nada, ofrecieron de un aporte en el área de la graficanción de los difrentes set de datos, lo que facilitó su estudio así como exploración.
+
+```{r}
+################################################################
+# Minería de Datos
+# Andrea Telleria - CI: 20.614.114
+# Asignacion #3: Aprendizaje no supervisado (Clustering)
+################################################################
+
+################################################################
+# Instalación de Paquetes necesarios
+################################################################
+
+#Creamos la función que recibe los paquetes
+install = function(pkg){
+  #Si ya está instalado, no lo instala.
+  if (!require(pkg, character.only = TRUE)) {
+    install.packages(pkg)
+    if (!require(pkg, character.only = TRUE)) stop(paste("load failure:", pkg))
+  }
+}
+install("foreach")
+#Seleccionamos los archivos que queremos instalar
+archive = c("scatterplot3d", "rgl", "rmarkdown")
+foreach(i = archive) %do% install(i)
+```
+
+## 2. Carga de Datos:
+
+Una vez se cuenta con las librerías, se pasa a cargar los datos que serán análizados.
+
+```{r}
+################################################################
+# Entrada de Datos
+################################################################
+a <- read.csv("a.csv", header = F)
+a.big <- read.csv("a_big.csv", header = F)
+good.luck <- read.csv("good_luck.csv", header = F)
+moon <- read.csv("moon.csv", header = F)
+h <- read.csv("h.csv", header = F)
+help <- read.csv("help.csv", header = F)
+s <- read.csv("s.csv", header = F)
+guess <- read.csv("guess.csv", header = F)
+```
+
+## 3. Análisis Exploratorio:
+
+Una vez tenermos nuestros datos pasamos a explorar nuestra data, para hacer esto se procedieron a graficar los diferentes set de datos con el fin de entender estos y así poder tomar decisiones lógicas con respecto a nuestros datos y a la forma en la que se realizaría el análisis.
+
+
+```{r}
+################################################################
+# Análisis Exploratorio: Graficando
+################################################################
+
+# Definiendo colores para 6 clusters
+def_color = function(numero){
+  if(numero == 1)
+    return("mediumpurple1")
+  else if(numero == 2)
+    return("blueviolet")
+  else if(numero == 3)
+    return("magenta")
+  else if(numero == 4)
+    return("hotpink")
+  else if(numero == 5)
+    return("maroon")
+  else
+    return("plum")
+}
+```
+
+Para ayudarnos a la hora de visualizar los sets de datos, se creó una función con la cual se manejó la paleta de colores con las que las clases serían posteriormente dibujadas. Dicha función, retorna un string con el color dado un número entero que sirva como clase.
+
+### 3.1 Set de Datos: A
+
+Primero que nada se pasó a graficar el set de datos de **A**, sabiendo las clases de A de antemano, se realizó la función paradeterminar los colores de la gráfica con ayuda de la función *sapply*, luego, se realizó la misma.
+
+```{r}
+# Set de Dtaos: A
+# Graficado en 2D
+color <- sapply(a$V3, def_color)
+plot(x = a$V1, y = a$V2,  col = color, pch = 20, main = "Set de Datos: A")
+```
+
+Como puede observarse en la gráfica pueden apreciarse tres nubes de puntos bien separadas y con aspecto circular. Estas nubes de puntos parecen bien separadas, lo que nos indica de antemano que un algoritmo como el de *K-Means* (K-Medias) puede ser lo mejor para este set de datos.
+
+### 3.2 Set de Datos: A Big
+
+Como se hizo anteriormente, lo primero fue realizar una búsqueda de los colores con ayuda de la función *sapply*, luego, se graficó el set de datos.
+
+```{r}
+# Set de Datos: A_BIG
+# Graficado en 2D
+color <- sapply(a.big$V3, def_color)
+plot(x = a.big$V1, y = a.big$V2,  col = color, pch = 20, main = "Set de Datos: A Big")
+```
+
+Puede verse como tanto **A** como **A Big** tienen muchas similitudes, la nube de puntos se encuentras en posiciones similares y la grafica resulta similar a la del set de datos de **A**, la mayor de la fiferencias es la cantidad de puntos, que produce que la separación entre las nubes de puntos no sea tan obvia y clara como en el caso del set de **A**.
+
+Se puede considerar el aplicar un algoritmo como el de *K-Means* (K-Medias) debido a su estructura.
+
+### 3.3 Set de Datos: Good Luck
+
+En este caso lo primero que se tomó en cuenta fue la cantidad de variables que se tenían, diez (10) sin contar con la varible que define la clase. Dada la alta dimencionalidad del set de datos, realizar una gráfica como las que se venían realizando no proveería de demasiada información, por lo cual se optó por un dagrama de disperción. 
+
+En este caso, no se usó de la función *def_color* para escoger los colores, en vez se realizón una condición con ayuda de *ifelse*. Esto se puedo hacer debido a la característica del set de datos, en el cual sólo pueden apreciarse dos clases.
+
+```{r}
+# Set de Datos: Good_Luck
+# Graficado en 2D: Diagrama de Dispersión
+color <- ifelse(good.luck$V11==0, "blueviolet", "deeppink") # Colores
+pairs(good.luck[1:10], main = "Set de Datos: Good Luck", pch = 20, col = color)
+```
+
+Puede verse como cada variable se relaciona con las demas, a su vez nos ayuda a entender que algoritmos como *K-Means* (K-Medias) puede resultar no muy beneficioso, análogo puede pensarse que un clustering jerárquico podría no producirnos resultados satisfactorios debido a que no se ve separación entre las clases, más allá de esto, se podría decir que las nube de puntos están encima una de otra.
+
+### 3.4 Set de Datos: Moon
+
+Como se venía haciendo, lo primero fue darse cuenta que la clase del set de datos era discreta y que el número de clases era dos (2). Una vez se tuvo esto se pasó a definir los colores del gráfico, finalmente se graficó el set de datos.
+
+```{r}
+# Set de Datos: Moon
+# Graficado en 2D
+color <- ifelse(moon$V3==0, "blueviolet", "deeppink") # Colores
+plot(x = moon$V1, y = moon$V2,  col = color, pch = 20, main = "Set de Datos: Moon")
+```
+
+Puede verse como cada clase tiene una estructura parecida al de una paravola, en el caso de una de las clases ésta (parábola) es concava hacía arriba y en el otro es concava hacía abajo, debido a la estructura se considera que el mejor algoritmo para tratar con el set podría ser el de clustering jerárquico, para el caso *Single*. Al mism tiempo no pareciese que *K-Means* (K-Medias) fuese la mejor solución.
+
+
+### 3.5 Graficación en 3D
+
+para realizar graficaciones en 3D con una paleta de colores propia, primero que nada se pasó a hacer uso de una función para tratar con gráficas con claes continuas. Esto con el fin de mostrar las clases originales antes de reedefinir estas.
+
+```{r}
+# Gráficos en 3D
+# Función para selección de colores dónde clase es una variable continua
+myColorRamp <- function(colors, values) {
+  v <- (values - min(values))/diff(range(values))
+  x <- colorRamp(colors)(v)
+  rgb(x[,1], x[,2], x[,3], maxColorValue = 255)
+}
+```
+
+### 3.6 Set de Datos: H
+
+Análizando el set de datos **H**, lo primero que se hizo obvio fue la cantidad de dimensines que éste poseía, exeptuando al set de datos **Good Luck**, todos los set de datos hasta ahora eran de dos dimensiones con su respectiva clase, en el caso de **H**, cabe destacar que, primero, su clase viene dada por una variable continua y no discreta, segundo, al poseer tres dimenciones su grafica no puede ser igual a la de los otros data set.
+
+```{r}
+# Data Set: H
+# Con Plot3d
+colors <- myColorRamp(rainbow(7), h$V4) 
+plot3d(h$V1,   # x axis
+       h$V2,   # y axis
+       h$V3,   # z axis
+       main = "Grafico 3D: H", col = colors, pch = 19)
+
+# Gráficado Estático
+scatterplot3d(h$V1,   # x axis
+              h$V2,   # y axis
+              h$V3,   # z axis
+              main="3-D Scatterplot: H", pch = 20, color = colors, 
+              angle = 75, scale.y = .5)
+```
+
+Con ayuda de la función para definir colores podemos colorear la grafica de tal forma que la clase continua pueda ser apreciada, de esta forma podemos entender la forma de sus datos.
+
+Como la gráfica lo demuestra la estructura del set de datos de **H**, guarda similaridad con una espiral de tres dimenciones, a su vez la clase va cambiando de tal forma que en el centro de la espiral estan los valores de clase más alejados a los de los puntos más externos de la espiral.
+
+#### 3.6.1 Definiendo una Clase Discreta para H:
+
+Como no es posible realizar un análisis usando matrices de confusión sobre un set de datos con clases continueas se hizo necesario el cambiar estos valores por unos discretos, de esta forma, se hizo necesario decidir en cuántas clases dividir el intervalo y posteriormente aplicar una función que reflejase el cambio en las clases.
+
+```{r}
+# Definiendo clases discretas
+hist(h$V4, main = "Histograma de la Clase del Set H", col = "blueviolet", border = "plum")
+definir_clase_h = function(numero){
+  # Seleccionando 4 cortes -> 5 clusters
+  if(numero < 6.0)
+    return(1)
+  else if(numero < 8.0)
+    return(2)
+  else if(numero < 10.0)
+    return(3)
+  else if(numero < 12.0)
+    return(4)
+  else
+    return(5)
+}
+
+# Graficación con clases discretas
+h$V5 <- sapply(h$V4, definir_clase_h)
+colors <- sapply(h$V5, def_color)
+scatterplot3d(h$V1,   # x axis
+              h$V2,   # y axis
+              h$V3,   # z axis
+              main="3-D Scatterplot: H con Clases Discretas", pch = 20, color = colors, 
+              angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Para escoger las divisiones, se decidió usar las mismas que se tienen en el histograma de la variable, de esta forma, usar la trozos equidistantes en los que se divide el histograma para escoger las clases.  
+
+Una vez se escogieron los intervalos se pasó a diseñar la función con la que se aplicaría el cambio a las clases, dicho cambio fue guardado en una columna extra dentro del set de datos, a modo de no perder la clase continua de ser necesitada luego.
+
+Una vez todo esto fue realizado se volvió a graficar la variable, esta vez con sus clases discretas.
+
+
+### 3.7 Set de Datos: HELP
+
+Similar a lo que ocurre con el set de datos **H**, el set de datos **Help** tiene tres dimensiones y su clase viene dado por un intervalo continuo, sabiendo ésto se decidió usar un acercamiento análogo al caso del set de datos de **H** para tratar al set de datos **Help**.
+
+```{r}
+# Data Set: Help
+# Graficado con Plot3d
+colors <- myColorRamp(rainbow(7), help$V4)
+plot3d(help$V1,   # x axis
+       help$V2,   # y axis
+       help$V3,   # z axis
+       main = "Grafico 3D: HELP", col = colors, pch = 19)
+
+# Graficado Estático
+scatterplot3d(help$V1,   # x axis
+              help$V2,   # y axis
+              help$V3,   # z axis
+              main="3-D Scatterplot: HELP", pch = 20, color = colors, 
+              angle = 45, scale.y = .5)
+```
+
+Se usó una vez más la funció de colores para ayudar a ver qué ocurre con la variable continua que nos da información de la clase y de cómo ésta se ve.
+
+Como la gráfica lo demuestra la estructura del set de datos de **Help**, se parece a la palabra *SOS*, dónde cada *S* parece ser una curva que vive en tres dimenciones y la *O* es una espiral entre ambas. Al mismo tiempo la manera en la que la clase está dividida es muy particular con ambas *S* siendo de la misma clase a pesar de que la nube de puntos que las define está muy separada. Además el centro de la espiral es la misma clase que la cola de las *S*. 
+
+#### 3.7.1 Definiendo una Clase Discreta para HELP:
+
+Como lo que nos ocurre con la clase continua es parecido al dilema que ocurrió durante el análisis exploratorio del set de datos de **H**, resultó natural tratar el caso de forma similar.
+
+```{r}
+# Definiendo clases discretas
+hist(help$V4, main = "Histograma de la Clase del Set Help", col = "blueviolet", border = "plum")
+definir_clase_help = function(numero){
+  # Seleccionando 4 cortes -> 5 clusters
+  if(numero < 0.0)
+    return(1)
+  else if(numero < 5.0)
+    return(2)
+  else if(numero < 10.0)
+    return(3)
+  else
+    return(4)
+}
+
+# Graficación con clases discretas
+help$V5 <- sapply(help$V4, definir_clase_help)
+colors <- sapply(help$V5, def_color)
+scatterplot3d(help$V1,   # x axis
+              help$V2,   # y axis
+              help$V3,   # z axis
+              main="3-D Scatterplot: HELP con Clases Discretas", pch = 20, color = colors, 
+              angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Para escoger las divisiones, se decidió usar las misma estrategía anterior, así pues el histograma de la variable nos dio la información de los trozos en los que se dividió la clase posteriormente.
+
+Una vez se escogieron los intervalos se pasó a diseñar la función con la que se aplicaría el cambio a las clases, dicho cambio fue guardado en una columna extra dentro del set de datos, a modo de no perder la clase continua de ser necesitada luego.
+
+Una vez todo esto fue realizado se volvió a graficar la variable, esta vez con sus clases discretas.
+
+### 3.8 Set de Datos: S
+
+el set de datos **S**, similar a los dos anteriores vive en tres dimenciones con su clase definida por un intervalo continuo. Así pues se realizó la estrategía prevía.
+
+```{r}
+# Data Set: S
+# Graficado con Plot3d
+colors <- myColorRamp(rainbow(7), s$V4)
+plot3d(s$V1,   # x axis
+       s$V2,   # y axis
+       s$V3,   # z axis
+       main = "Grafico 3D: S", col = colors, pch = 19)
+
+# Graficado Estático
+scatterplot3d(s$V1,   # x axis
+              s$V2,   # y axis
+              s$V3,   # z axis
+              main="3-D Scatterplot: S", pch = 20, color = colors, 
+              angle = 45, scale.y = .5)
+```
+
+Se usó una vez más la funció de colores para ayudar a ver qué ocurre con la variable continua que nos da información de la clase y de cómo ésta se ve.
+
+Como la gráfica lo demuestra, la estructura del set de datos de **S**, se parece a la letra *S*, esta *S* que vive en tres dimenciones tiene la característica e que su clase es diferente a lo largo de toda la letra, comenzando en un color y terminando en otro. En este aspecto se puede mencionar su parecido con las *S's* que forman parte del set de datos de **Help**.
+
+#### 3.8.1 Definiendo una Clase Discreta para S:
+
+Como lo que nos ocurre con la clase continua es parecido al dilema que ocurrió durante el análisis exploratorio del set de datos de **H** y **Help**, resultó natural tratar el caso de forma similar.
+
+```{r}
+# Definiendo clases discretas
+hist(s$V4, main = "Histograma de la Clase del Set S", col = "blueviolet", border = "plum")
+definir_clase_s = function(numero){
+  if(numero < -4.0)
+    return(1)
+  else if(numero < -2.0)
+    return(2)
+  else if(numero < 0.0)
+    return(3)
+  else if(numero < 4.0)
+    return(4)
+  else
+    return(5)
+}
+
+# Aplicando la función y sustituyendo el valor continuo por uno discreto
+s$V5 <- sapply(s$V4, definir_clase_s)
+colors <- sapply(s$V5, def_color)
+scatterplot3d(s$V1,   # x axis
+              s$V2,   # y axis
+              s$V3,   # z axis
+              main="3-D Scatterplot: S con Clases Discretas", pch = 20, color = colors, 
+              angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Para escoger las divisiones, se decidió usar las misma estrategía que se venía usando, así pues el histograma de la variable nos dio la información de los trozos en los que se dividió la clase posteriormente.
+
+Una vez se escogieron los intervalos se pasó a diseñar la función con la que se aplicaría el cambio a las clases, dicho cambio fue guardado en una columna extra dentro del set de datos, a modo de no perder la clase continua de ser necesitada luego.
+
+Una vez todo esto fue realizado se volvió a graficar la variable, esta vez con sus clases discretas.
+
+### 3.9 Set de Datos: Guess
+
+Este set de datos tiene una particularidad que no comparte con ninguno de los demás, esta particularidad es el hecho de que no se tiene una variable con la clase a la que pertenecen los individuos que conforman el set. Así pues nos limitaremos a graficarlo para ver la forma en la que la nube de puntos está organizada.
+
+```{r}
+# Data Set: Guess
+# Grafica en 2D
+plot(x = guess$V1, y = guess$V2,  col = "blueviolet", pch = 20, main = "Set de Datos: Guess")
+```
+
+A simple vista puede verse como hay dos nubes de puntos, aunque si se estudia con más cuidado puede parecer también que la nube de puntos más grandes no es más que varias nubes de puntos con poca separación entre ellas, hasta el punto en el que pareciesen una. A su vez, dada la estructura de las nubes la cual parece ligeramente elíptica el algoritmo de *K-Means* (K-Medias) puede resultar bueno a la hora de aplicar algoritmos de clustering al set de datos.
+
+## 4. Clustering
+
+Primero que nada se creo una variable en la cual no se tomase en cuenta la variable referente a la clase para no tener problemas a la hora de aplicar os métodos, en el caso de las varibles dónde se tienen más de una columna referente a ésta (caso de clases continuas y discretas), ambas fueron dejadas de lado de forma que no afectasen el algoritmo de clustering.
+
+```{r}
+################################################################
+# Clustering
+################################################################
+# Primero que nada eliminamos la columna con la clase para poder aplicar los métodos de clustering
+a1 <- a[-c(3)]
+a.big1 <- a.big[-c(3)]
+good.luck1 <- good.luck[-c(11)]
+h1 <- h[-c(4, 5)]
+help1 <- help[-c(4, 5)]
+moon1 <- moon[-c(3)]
+s1 <- s[-c(4, 5)]
+```
+
+### 4.1 *K-Means*
+
+A continuación se mostrará los resultados de aplicarse el método de K-Means a los diferentes set de datos.
+
+#### 4.1.1 K-Means: Set **A**
+
+```{r}
+# Set de Datos: A
+# Aplicando el método K-Means
+k <- kmeans(a1, 3, iter.max = 500)
+color <- sapply(k$clust, def_color)
+plot(a1, col=color, pch=19)
+points(k$centers, pch = 19, col = "navy", cex = 1)
+table(k$cluster, a$V3)
+
+# Set de Datos: A
+# Aplicando el método K-Means con centros dados
+init.c <- rbind(c(-20,18),
+                c(-20,20),
+                c(-20,10))
+k <- kmeans(a1, centers = init.c, iter.max = 500)
+color <- sapply(k$clust, def_color)
+plot(a1, col=color, pch=19)
+points(k$centers, pch = 19, col = "navy", cex = 1)
+table(k$cluster, a$V3)
+```
+
+Como puede observarse el resultado de *K-Means* resulta muy bueno en el caso del set de **A** debido a la forma que tienen las nubes de puntos. Esto además puede verse reflejado en la tabla que funciona como matriz de confusión, ya sea dando puntos o no, el algoritmo tiende a converger en una solución que resulta muy buena para el set de datos que se tiene.
+
+En el caso de esta tabla hay que resaltar que debido a las características de *K-means* es imposible predecir que clase va a considerarse con cual nombre, por ejemplo al momento del clustering, la clase que viene definida por el número uno (1), puede ser considerada como parte del clsuter dos (2), pero por la manera en la que éste clsuter se ve dibujado se puede asumir que es el cluster que refleja las características de la clase uno (1).
+
+Por esto, a la hora de realizar la matriz de confusión es necesario tener esto en cuenta para no cometer errores cuando se lee la misma. Los nombres que se les da a las clases muchas veces no son los nombres de los clusters, de hecho, raramente son los mismos.
+
+#### 4.1.2 K-Means: Set **A Big**
+
+Para realizar el análisis sobre este set de datos se tuvieron que tener en cuenta ciertos puntos. El primero es la utilización de una implementación de *K-Means* con el fin de estudiar cómo trabaja el algoritmo para set de datos muy grandes. 
+
+Sabemos que, para casos como estos lo más importante es hacer que el algoritmo converja con rapidez, para lograr esto tomar una muestra, descbrir sus centros y luego usarlos sobre el set de datos entero es lo más lógico.
+
+Sabiendo, además, que contamos con una muestra (set de datos **A**), pasaremos a utilizar los centros generados al aplicar *kmeans* de **A** para ayudar a que el algorimo converja con rapidez en el caso de **A Big**.
+
+##### 4.1.2.1 Implementación de K-Means
+
+```{r}
+# Función de distancia, en este caso, Euclideana
+euclidean.dist <- function(x1, x2) {
+  distanceMatrix <- matrix(NA, nrow=dim(x1)[1], ncol=dim(x2)[1])
+  for(i in 1:nrow(x2)) {
+    distanceMatrix[,i] <- sqrt(rowSums(t(t(x1)-x2[i,])^2))
+  }
+  distanceMatrix
+}
+
+# K-Means, dónde Iter es el número de Iteraciones
+K.Means <- function(x, centers, fun.dist, Iter) {
+  clusterHistory <- vector(Iter, mode="list")
+  centerHistory <- vector(Iter, mode="list")
+  for(i in 1:Iter) {
+    distsACenters <- fun.dist(x, centers)
+    clusters <- apply(distsACenters, 1, which.min)
+    centers <- apply(x, 2, tapply, clusters, mean)
+    clusterHistory[[i]] <- clusters
+    centerHistory[[i]] <- centers
+  }
+  list(clusters = clusterHistory, centers = centerHistory)
+}
+```
+
+Primero que nada se tiene una función que dado una lista con los diferentes centros y una matriz con los datos, pudiese calcular la matriz de distancia. Es importante que la entrada sea de esa forma. Esta matriz de distancia funciona con la distancia Euclideana, la cual calcula mediante el uso de transposición de matrices, funciones como *rowsum* y *sqrt*. 
+
+La función *K.Means* trabaja con los centros, la data (la cual debe ser una matriz), el número de iteraciones y el nombre de la función de distancia a utilizar. Con esto se crea una matriz a la que se le van añadiendo como niveles las actualizaciones realizadas con cada iteración. De esta forma se van guardando los cambios realizados, con ésto si se desea acceder a la última versión de los datos, se usa el nivel que resulta de la iteración. 
+
+##### 4.1.2.2 Aplicando la Implementación sobre: **A Big**
+
+```{r}
+# En el caso de usar los centros de A
+a.big1 <- as.matrix(a.big1)
+k <- kmeans(a1, 3, iter.max = 500)
+centers <- k$centers
+res <- K.Means(a.big1, centers, euclidean.dist, 10)
+color <- sapply(res$clusters[[10]], def_color)
+plot(a.big1, col=color, pch=19)
+
+# Con centros aleatorios
+centers <- a.big1[sample(nrow(a.big1), 3),]
+res <- K.Means(a.big1, centers, euclidean.dist, 10)
+color <- sapply(res$clusters[[10]], def_color)
+plot(a.big1, col=color, pch=19)
+```
+Debido a que el algorimo no cuenta con una forma de detectar los cambios (o carencia de cambios) mediante algún tipo de tolerancia no es posible apreciar el que, dados los centros el algorimo se torne perceptívamente más rápido, sin embargo, puede apreciarse como si es verdad que trabaja mejor, pudiendo llegar a ser más preciso con la misma cantidad de iteraciones.
+
+La nube de puntos, al ser similar a la de **A**, con una forma elíptica y con distancia entre puntos se puede considerar como un perfecto ejemplo de lo que sería un set de datos ideal para la aplicación de *K-Means*, sabiendo ésto no es de extrañar que el algoritmo de clustering retorne una solución satisfactoria.
+
+#### 4.1.3 K-Means: Set **Good Luck**
+
+##### 4.1.3.1 Reduciendo Dimensionalidad:
+```{r}
+# Set de Datos: good_luck
+# Aplicando PCA para reducir dimensionalidad
+good.luck.pca <- prcomp(good.luck1,
+                 center = TRUE,
+                 scale. = TRUE)
+summary(good.luck.pca)
+```
+
+Primero que nada se pensó en aplicar PCA para así redcir las dimenciones, dadas las características de PCA se pensó además en encontrar una forma de hacer los datos más separables de forma que se pudiese realizar un algoritmo de clustering con un resultado positivo, al realizarse la función PAC sobre los datos, fue obvio que esto no era posible.
+
+De las diez (10) variables que se tienen (dónde la onceaba fue eliminada ya que era la que proveía la información de las clases), todas aportan información, de esta manera la aplicación de PCA no implica beneficios. De todas formas se considera que es información interesante a la hora de entender el set de datos el saber cuánta importancia lleva cada variable.
+
+##### 4.1.3.1 Apicando K-Means:
+
+```{r}
+# Aplicando el método K-Means sobre set original
+# Aplicando el método K-Means
+k <- kmeans(good.luck1, 2, iter.max = 500)
+color <- ifelse(k$clust==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19)
+table(k$cluster, good.luck$V11)
+
+# Aplicando el método K-Means sobre good.luck.pca
+# Aplicando el método K-Means
+k <- kmeans(good.luck.pca$x, 2, iter.max = 500)
+color <- ifelse(k$clust==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19)
+table(k$cluster, good.luck$V11)
+```
+
+Primero se le aplicó el *K-Means* al set de datos original, es decir, sin haberle aplicado aún la función *prcomp*, el resultado obtenido,como era de esperarse, no fue muy bueno, esto sin duda, se debe a la nula separación que hay entre las variables, con este tipo de set de datos, *K-Means* mo resulta el algoritmo óptimo.
+
+Luego se aplicó nuevamente *K-Means*, pero en este caso, sobre los componentes principales previamente hayados, debido a la importancia que se le dio a las columnas fue imposible deshacernos de ninguna a la hora de realizar el estudio, por lo cual, como era de esperarse los datos no distaron mucho de los obtenidos de aplicar el *K-Means* sobre el set de datos original. Si acaso, hubo una mejora de no más de cinco individuos los cuales (si tomamos como que el mayor número de cluster es la clase y el otro los errores) no fueron mal clasificados.
+
+En este ejemplo no resultó plausible escoger centros para observar la forma en la que reaccionaba el algoritmo, más que nada debido a la cantidad de dimenciones que se tienen las cuales convierten del set de datos en un problema mucho más complicado de lo que podría imaginarse.
+
+#### 4.1.4 K-Means: Set **Moon**
+
+```{r}
+# Set de Datos: Moon
+# Aplicando el método K-Means
+k <- kmeans(moon1, 2, iter.max = 500)
+color <- ifelse(k$clust==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19)
+points(k$centers, pch = 19, col = "navy", cex = 1)
+table(k$cluster, moon$V3)
+# Set de Datos: Moon
+# Aplicando el método K-Means con centros dados
+init.c <- rbind(c(1,2),
+                c(-1,-1))
+k <- kmeans(moon1, centers = init.c, iter.max = 500)
+color <- ifelse(k$clust==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19)
+points(k$centers, pch = 19, col = "navy", cex = 1)
+table(k$cluster, moon$V3)
+```
+
+Como se predijo durante el análisis exploratorio, para este set de datos el método de *K-Means* resulta en un gran número de errores, como se demuestra con las matrices de confusión, esto se debe a la forma que tiene el set, el cual es alargado siguiendo la forma de parabolas. 
+
+Se sabe que el método de *K-Means* da mejores resultados cuando las nubes de puntos estan separadas y tienen formas elípticas, como el set **Moon** no tiene este tipo de forma no es de extrañar el resultado obtenido.
+
+Incluso escogiendo centros éstos tienden a converger más rápido, pero sobre los mismos lugares de si se dejan puntos iniciales aleatorios.
+
+#### 4.1.5 K-Means: Set **H**
+
+```{r}
+# Set de Datos: H
+# Aplicando el método K-Means
+k <- kmeans(h1, 5, iter.max = 500)
+colors <- sapply(k$clust, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="K-Mean: H", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+h.plot$points3d(k$centers, pch = 19, col = "navy", cex = 1.5)
+table(k$cluster, h$V5)
+# Set de Datos: H
+# Aplicando el método K-Means con centros dados
+init.c <- rbind(c(10,10,5),
+                c(0,5,5),
+                c(-10,10,5),
+                c(0,5,0),
+                c(0,5,-10))
+k <- kmeans(h1, centers = init.c, iter.max = 500)
+colors <- sapply(k$clust, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="K-Mean: H", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+h.plot$points3d(k$centers, pch = 19, col = "navy", cex = 1.5)
+table(k$cluster, h$V5)
+```
+
+Para este set de datos el método de *K-Means* resulta en un número de errores no despreciables, como se demuestra con las matrices de confusión, esto se debe a la forma que tiene el set similar al caso del set de **Moon**, el cual al no tener una estructura conveniente termina causando que el método no resulte con un modeo satisfactorio.
+
+Aún con centros, el algoritmo siempre tiende a acercarse a los mismos puntos, dividiendo la espiral, no por tramos como debería, sino por secciones en las que se hubican las centros de las esferas. Cabe destacar que lo que K-Means trata de hacer cuando se trata de clustering en tres dimenciones (3D), se basa en minimizar y unificar ángulos entre componentes, además de necesitar que los puntos estén separados para funcionar mejor. 
+
+#### 4.1.6 K-Means: Set **HELP**
+
+```{r}
+# Set de Datos: HELP
+# Aplicando el método K-Means
+k <- kmeans(help1, 4, iter.max = 500)
+colors <- sapply(k$clust, def_color)
+h.plot <- scatterplot3d(help1$V1,   # x axis
+                        help1$V2,   # y axis
+                        help1$V3,   # z axis
+                        main="K-Mean: HELP", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+h.plot$points3d(k$centers, pch = 19, col = "navy", cex = 1.5)
+table(k$cluster, help$V5)
+# Set de Datos: HELP
+# Aplicando el método K-Means con centros dados
+init.c <- rbind(c(0,10,0),
+                c(60,10,0),
+                c(25,10,0),
+                c(25,10,-10))
+k <- kmeans(help1, centers = init.c, iter.max = 500)
+k <- kmeans(help1, 4, iter.max = 500)
+colors <- sapply(k$clust, def_color)
+h.plot <- scatterplot3d(help1$V1,   # x axis
+                        help1$V2,   # y axis
+                        help1$V3,   # z axis
+                        main="K-Mean: HELP", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+h.plot$points3d(k$centers, pch = 19, col = "navy", cex = 1.5)
+table(k$cluster, help$V5)
+```
+
+Para este set de datos el método de *K-Means* resulta en un número de errores muy alto, como se demuestra con las matrices de confusión, esto se debe a la forma que tiene el set, ya que si bien ambas *Ss* forman parte de la misma clase, se encuentras distanciadas entre ellas, este tipo de nube de puntos es muy complicada a la hora de realizar clustering. La mejor opción seria considerar ambas *Ss* como clusters separados que es lo que el algoritmo trata de hacer, al final resulta imposible, incluso pasando centros como parámetros, que el resultado de *K-Means* sea un modelo satifactorio.
+
+#### 4.1.7 K-Means: Set **S**
+
+```{r}
+# Set de Datos: S
+# Aplicando el método K-Means
+k <- kmeans(s1, 5, iter.max = 500)
+colors <- sapply(k$clust, def_color)
+h.plot <- scatterplot3d(s1$V1,   # x axis
+                        s1$V2,   # y axis
+                        s1$V3,   # z axis
+                        main="K-Mean: S", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+h.plot$points3d(k$centers, pch = 19, col = "navy", cex = 1.5)
+table(k$cluster, s$V5)
+# Set de Datos: S
+# Aplicando el método K-Means con centros dados
+init.c <- rbind(c(-1,1,-2),
+                c(1,1,2),
+                c(0.4,0.5,1),
+                c(0.5,1,-0.5),
+                c(0,1,2))
+k <- kmeans(s1, centers = init.c, iter.max = 500)
+k <- kmeans(s1, 5, iter.max = 500)
+colors <- sapply(k$clust, def_color)
+h.plot <- scatterplot3d(s1$V1,   # x axis
+                        s1$V2,   # y axis
+                        s1$V3,   # z axis
+                        main="K-Mean: S", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+h.plot$points3d(k$centers, pch = 19, col = "navy", cex = 1.5)
+table(k$cluster, s$V5)
+```
+
+Es interesante como para este set de datos, si bien *K-Means* no resulta en un buen método no es tan malo como podría pensarse tampoco, dado la forma de las clases el algoritmo resulta en uno que si bien clasifica muy mal ciertas clases para otras no resulta tan malo. Esto puede apreciarse bien si se ve la matriz de confusión resultante.
+
+Cabe destacar que dados los centros, el algoritmo, similar a o que viene ocurriendo hasta ahora en el estudio, no cambia mucho con respecto a dejar que sean aleatorios.
+
+#### 4.1.8 K-Means: Set **Guess**
+
+Como se mencionó una vez el set de datos **Guess*** resulta bastante especial, esto se debe a que no tiene una variable que me defina la clase, es por esto que realizar un modelo con **Guess** implica tomar cieertas deciciones. 
+
+##### 4.1.8.1 Codo de Jambú
+
+```{r}
+# Set de Datos: Guess
+# Aplicando el método K-Means
+# Buscando antidad óptima de clusters
+wss <- (nrow(guess)-1)*sum(apply(guess,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(guess, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Numero de Clusters", ylab="Suma de Cuadrados", 
+     main = "Codo de Jambú: Guess", col = "blueviolet")
+```
+
+La primera se presentó como la cantidad de clsuters en los que se planeaba dividir la data, como se dijo en un momento al realizar el estudio exploratorio hay dos formas de ver la gráfica de de **Guess**, la primera es como dos nubes de puntos y la segunda es como más de dos nubes de puntos en este caso hay varias nubes de puntos sin distancia entre ellas. 
+
+Para estar seguro sobre el número de clusters se realizó el método del codo de Jambú, el cual hace uso del SSE (*Sum of Squared Error*, Suma del Cuadrado de los Errores) de diferentes *K-Means* para detectar un óptimo número de clusters.
+
+Haciendo uso de éste método para escoger K, se detecó que el mejor número era 4~5 clusters, como puede observarse en la gráfica. Así pues se decidióusar cuatro (4) como número de clusters.
+
+##### 4.1.8.2 Aplicando K-Means
+
+```{r}
+# Aplicando K-Means con 5 Clusters
+k <- kmeans(guess, 4, iter.max = 500)
+colors <- sapply(k$clust, def_color)
+plot(guess, col=colors, pch=19)
+points(k$centers, pch = 19, col = "navy", cex = 1)
+# Set de Datos: S
+# Aplicando el método K-Means con centros dados
+init.c <- rbind(c(-20,-20),
+                c(-20,20),
+                c(20,0),
+                c(45,45))
+k <- kmeans(guess, centers = init.c, iter.max = 500)
+plot(guess, col=colors, pch=19)
+points(k$centers, pch = 19, col = "navy", cex = 1)
+```
+
+La aplicación de K-Means parece resultar en grupos bien definidos con un ligero parecido a lo que podría apreciarse si se hubiese pensado en la nube de puntos de mayor tamaño como un conjunto de puntos.
+
+### 4.2 CLustering Jerárquico
+
+```{r}
+################################################################
+# Clustering Jerarquico
+################################################################
+```
+
+A continuación, siguen las soluciones encontradas después de aplicar clustering jerárquico a los diferentes set de datos que se tenían.
+
+#### 4.2.1 Clsutering Jerárquico: Set **A**
+
+Lo primero que es importante resaltar son las diferentes distancias utilizadas cuando se aplican clusterng jerárquico, durante este análicisis trabajaremos con varias distancias, para ver cuáles son las mejores opciones.
+
+##### 4.2.1.1 Clsutering Jerárquico: Set **A** con distancia Euclideana
+
+```{r}
+# Set de datos: A
+# Buscamos la distancia
+distancia1 = dist(a1, method = "euclidean")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia1, method = "single")
+plot(cluster1, main = "Cluster de A: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia1, method = "complete")
+plot(cluster2, main = "Cluster de A: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia1, method = "average")
+plot(cluster3, main = "Cluster de A: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia1, method = "ward.D")
+plot(cluster4, main = "Cluster de A: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia1, method = "ward.D2")
+plot(cluster5, main = "Cluster de A: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia1, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia1, method = "median")
+plot(cluster7, main = "Cluster de A: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia1, method = "centroid")
+plot(cluster8, main = "Cluster de A: Método Centroid", col = "blueviolet")
+```
+
+A simple vista pareciese que la mayoría de los dendogramas tienen cierto aspecto parecido, pudiendo apreciar tres clases principales.
+
+##### 4.2.1.2 Matrices de Confusión del Clsutering Jerárquico: Set **A** con distancia Euclideana
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 3)
+table(t1, a$V3)
+color <- sapply(t1, def_color)
+plot(a1, col=color, pch=19, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 3)
+table(t2, a$V3)
+color <- sapply(t2, def_color)
+plot(a1, col=color, pch=19, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 3)
+table(t3, a$V3)
+color <- sapply(t3, def_color)
+plot(a1, col=color, pch=19, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 3)
+table(t4, a$V3)
+color <- sapply(t4, def_color)
+plot(a1, col=color, pch=19, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 3)
+table(t5, a$V3)
+color <- sapply(t5, def_color)
+plot(a1, col=color, pch=19, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 3)
+table(t6, a$V3)
+color <- sapply(t6, def_color)
+plot(a1, col=color, pch=19, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 3)
+table(t7, a$V3)
+color <- sapply(t7, def_color)
+plot(a1, col=color, pch=19, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 3)
+table(t8, a$V3)
+color <- sapply(t8, def_color)
+plot(a1, col=color, pch=19, main = "Método Centroid")
+```
+
+Si bien la mayoría de los casos pueden distinguirse bien los tres grupos de nubes de puntos, siempre hay un más alto indice de error que si aplicamos *K-Means*, cabe destacar que hay algunos métodos de clustering jerárquico que son muy malos para este data set, se resalta el performance del método *Single* y *Median*. 
+
+##### 4.2.1.3 Clsutering Jerárquico: Set **A** con distancia Maximum
+
+```{r}
+# Set de datos: A
+# Buscamos la distancia
+distancia1 = dist(a1, method = "maximum")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia1, method = "single")
+plot(cluster1, main = "Cluster de A: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia1, method = "complete")
+plot(cluster2, main = "Cluster de A: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia1, method = "average")
+plot(cluster3, main = "Cluster de A: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia1, method = "ward.D")
+plot(cluster4, main = "Cluster de A: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia1, method = "ward.D2")
+plot(cluster5, main = "Cluster de A: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia1, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia1, method = "median")
+plot(cluster7, main = "Cluster de A: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia1, method = "centroid")
+plot(cluster8, main = "Cluster de A: Método Centroid", col = "blueviolet")
+```
+
+Igual que lo ocurrido con anterioridad, pueden verse ciertas similitudes entre la mayoría de los dendográmas, con alguna que otra exepción (por ejemplo, el dendográma del método *Single*).
+
+##### 4.2.1.4 Matrices de Confusión del Clsutering Jerárquico: Set **A** con distancia Maximum
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 3)
+table(t1, a$V3)
+color <- sapply(t1, def_color)
+plot(a1, col=color, pch=19, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 3)
+table(t2, a$V3)
+color <- sapply(t2, def_color)
+plot(a1, col=color, pch=19, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 3)
+table(t3, a$V3)
+color <- sapply(t3, def_color)
+plot(a1, col=color, pch=19, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 3)
+table(t4, a$V3)
+color <- sapply(t4, def_color)
+plot(a1, col=color, pch=19, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 3)
+table(t5, a$V3)
+color <- sapply(t5, def_color)
+plot(a1, col=color, pch=19, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 3)
+table(t6, a$V3)
+color <- sapply(t6, def_color)
+plot(a1, col=color, pch=19, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 3)
+table(t7, a$V3)
+color <- sapply(t7, def_color)
+plot(a1, col=color, pch=19, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 3)
+table(t8, a$V3)
+color <- sapply(t8, def_color)
+plot(a1, col=color, pch=19, main = "Método Centroid")
+```
+
+Como puede observarse en la mayoría de los casos, el cambio en el uso de la distancia implicóuna mejora, aún a pesar de esto puede seguir considerándose como mejor opción el uso de *K-Means* para este data set.
+
+##### 4.2.1.5 Clsutering Jerárquico: Set **A** con distancia Manhattan
+
+```{r}
+# Set de datos: A
+# Buscamos la distancia
+distancia1 = dist(a1, method = "manhattan")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia1, method = "single")
+plot(cluster1, main = "Cluster de A: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia1, method = "complete")
+plot(cluster2, main = "Cluster de A: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia1, method = "average")
+plot(cluster3, main = "Cluster de A: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia1, method = "ward.D")
+plot(cluster4, main = "Cluster de A: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia1, method = "ward.D2")
+plot(cluster5, main = "Cluster de A: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia1, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia1, method = "median")
+plot(cluster7, main = "Cluster de A: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia1, method = "centroid")
+plot(cluster8, main = "Cluster de A: Método Centroid", col = "blueviolet")
+```
+
+Igual que lo ocurrido con anterioridad, pueden verse ciertas similitudes entre la mayoría de los dendográmas, apeciándose que hay tres clusters bien diferenciados.
+
+##### 4.2.1.6 Matrices de Confusión del Clsutering Jerárquico: Set **A** con distancia Manhathan
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 3)
+table(t1, a$V3)
+color <- sapply(t1, def_color)
+plot(a1, col=color, pch=19, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 3)
+table(t2, a$V3)
+color <- sapply(t2, def_color)
+plot(a1, col=color, pch=19, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 3)
+table(t3, a$V3)
+color <- sapply(t3, def_color)
+plot(a1, col=color, pch=19, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 3)
+table(t4, a$V3)
+color <- sapply(t4, def_color)
+plot(a1, col=color, pch=19, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 3)
+table(t5, a$V3)
+color <- sapply(t5, def_color)
+plot(a1, col=color, pch=19, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 3)
+table(t6, a$V3)
+color <- sapply(t6, def_color)
+plot(a1, col=color, pch=19, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 3)
+table(t7, a$V3)
+color <- sapply(t7, def_color)
+plot(a1, col=color, pch=19, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 3)
+table(t8, a$V3)
+color <- sapply(t8, def_color)
+plot(a1, col=color, pch=19, main = "Método Centroid")
+```
+
+Se puede decir que con este tipo de distancia se consiguió que entre métodos la variaciones de las respuestas fuesen menor que en casos anteriores, en este caso, el método de *Median* mostró cierta mejora, aún así la tasa de error sigue siendo mayor a la que se obtiene con el uso de *K-Means*.
+
+
+#### 4.2.2 Clsutering Jerárquico: Set **Good Luck**
+
+Lo primero que es importante resaltar son las diferentes distancias utilizadas cuando se aplican clusterng jerárquico, durante este análicisis trabajaremos con varias distancias, para ver cuáles son las mejores opciones.
+
+##### 4.2.2.1 Clsutering Jerárquico: Set **Good Luck** con distancia Euclideana
+
+```{r}
+# Set de datos: Good Luck
+# Buscamos la distancia
+distancia2 = dist(good.luck1, method = "euclidean")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia2, method = "single")
+plot(cluster1, main = "Cluster de Good Luck: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia2, method = "complete")
+plot(cluster2, main = "Cluster de Good Luck: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia2, method = "average")
+plot(cluster3, main = "Cluster de Good Luck: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia2, method = "ward.D")
+plot(cluster4, main = "Cluster de Good Luck: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia2, method = "ward.D2")
+plot(cluster5, main = "Cluster de Good Luck: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia2, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia2, method = "median")
+plot(cluster7, main = "Cluster de Good Luck: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia2, method = "centroid")
+plot(cluster8, main = "Cluster de Good Luck: Método Centroid", col = "blueviolet")
+```
+
+Para este set de datos los dendográmas tienen formas muy particulares, donde los que se ven mejor serían los del método *Ward.D* y *Ward.D2*.
+
+##### 4.2.2.2 Matrices de Confusión del Clsutering Jerárquico: Set **Good Luck** con distancia Euclideana
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 2)
+table(t1, good.luck$V11)
+color <- ifelse(t1==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 2)
+table(t2, good.luck$V11)
+color <- ifelse(t2==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 2)
+table(t3, good.luck$V11)
+color <- ifelse(t3==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 2)
+table(t4, good.luck$V11)
+color <- ifelse(t4==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 2)
+table(t5, good.luck$V11)
+color <- ifelse(t5==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 2)
+table(t6, good.luck$V11)
+color <- ifelse(t6==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 2)
+table(t7, good.luck$V11)
+color <- ifelse(t7==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 2)
+table(t8, good.luck$V11)
+color <- ifelse(t8==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Centroid")
+```
+
+Si bien los dendográmas de *Ward.D* y *Ward.D2* parecían ser a simple vista decentes, se demostró que no lo eran mucho cuando llegó la hora de ver las tablas de confusión asciadas, de hecho de todos los métodos de clustering jerárquico ninguno fue bueno. El mejor podría considerarse como el del método *Average* y *Ward.D2*, aunque al final, la tasa de error tiene a ser tan alta como la tasa de acierto.
+
+##### 4.2.2.3 Clsutering Jerárquico: Set **Good Luck** con distancia Maximum
+
+```{r}
+# Set de datos: Good Luck
+# Buscamos la distancia
+distancia2 = dist(good.luck1, method = "maximum")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia2, method = "single")
+plot(cluster1, main = "Cluster de Good Luck: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia2, method = "complete")
+plot(cluster2, main = "Cluster de Good Luck: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia2, method = "average")
+plot(cluster3, main = "Cluster de Good Luck: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia2, method = "ward.D")
+plot(cluster4, main = "Cluster de Good Luck: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia2, method = "ward.D2")
+plot(cluster5, main = "Cluster de Good Luck: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia2, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia2, method = "median")
+plot(cluster7, main = "Cluster de Good Luck: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia2, method = "centroid")
+plot(cluster8, main = "Cluster de Good Luck: Método Centroid", col = "blueviolet")
+```
+
+Como en el caso anterior hay algunos dendográmas con formas atípicas, pero en la mayoría no se puede apreciar mucho debido a la cantidad de data.
+
+##### 4.2.2.4 Matrices de Confusión del Clsutering Jerárquico: Set **Good Luck** con distancia Maximum
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 2)
+table(t1, good.luck$V11)
+color <- ifelse(t1==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 2)
+table(t2, good.luck$V11)
+color <- ifelse(t2==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 2)
+table(t3, good.luck$V11)
+color <- ifelse(t3==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 2)
+table(t4, good.luck$V11)
+color <- ifelse(t4==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 2)
+table(t5, good.luck$V11)
+color <- ifelse(t5==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 2)
+table(t6, good.luck$V11)
+color <- ifelse(t6==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 2)
+table(t7, good.luck$V11)
+color <- ifelse(t7==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 2)
+table(t8, good.luck$V11)
+color <- ifelse(t8==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Centroid")
+```
+
+En la mayoría de los casos el cambio en la distancia no trajo mucha diferencia. El único caso que es rescatable es lo ocurrido con el método *Ward.D* y *Ward.D2*, en el caso del primero el cambio de la distancia significó una gran mejora (aunque sigue equivocándose en alrededor de la mitad de los casos), mientras que en el caso del segundo empeoró mucho. Tanto así que se puede decir que es tan malo como el resto.
+
+Los mejores con la distancia Maximum fueron así, *Avarage* que pareció empeorar un poco y *Ward.D* que mejoró apreciativamente.
+
+##### 4.2.2.5 Clsutering Jerárquico: Set **Good Luck** con distancia Manhattan
+
+```{r}
+# Set de datos: Good Luck
+# Buscamos la distancia
+distancia2 = dist(good.luck1, method = "manhattan")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia2, method = "single")
+plot(cluster1, main = "Cluster de Good Luck: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia2, method = "complete")
+plot(cluster2, main = "Cluster de Good Luck: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia2, method = "average")
+plot(cluster3, main = "Cluster de Good Luck: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia2, method = "ward.D")
+plot(cluster4, main = "Cluster de Good Luck: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia2, method = "ward.D2")
+plot(cluster5, main = "Cluster de Good Luck: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia2, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia2, method = "median")
+plot(cluster7, main = "Cluster de Good Luck: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia2, method = "centroid")
+plot(cluster8, main = "Cluster de Good Luck: Método Centroid", col = "blueviolet")
+```
+
+Igual que lo ocurrido con anterioridad, hay dendográmas que tienen formas muy particulares con alguno que otro mostrando una estructura de árbol.
+
+##### 4.2.2.6 Matrices de Confusión del Clsutering Jerárquico: Set **Good Luck** con distancia Manhathan
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 2)
+table(t1, good.luck$V11)
+color <- ifelse(t1==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 2)
+table(t2, good.luck$V11)
+color <- ifelse(t2==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 2)
+table(t3, good.luck$V11)
+color <- ifelse(t3==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 2)
+table(t4, good.luck$V11)
+color <- ifelse(t4==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 2)
+table(t5, good.luck$V11)
+color <- ifelse(t5==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 2)
+table(t6, good.luck$V11)
+color <- ifelse(t6==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 2)
+table(t7, good.luck$V11)
+color <- ifelse(t7==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 2)
+table(t8, good.luck$V11)
+color <- ifelse(t8==1, "blueviolet", "deeppink") # Colores
+plot(good.luck1, col=color, pch=19, main = "Método Centroid")
+```
+
+Con este tipo de distancia se consiguieron ciertas mejoras con respecto al método Complete, que en casos anteriores no había mostrado mucho, para el método *Ward.D* se mostraron ciertas mejoras, y para el caso *Avarage* mostró empeorar. 
+
+Para el caso *Ward.D2* puede decirse que fue el mejor de todos, aunque no resulta muy alentador si uno decide mirar de cerca la matriz de confusión.
+
+
+#### 4.2.3 Clsutering Jerárquico: Set **Moon**
+
+Lo primero que es importante resaltar son las diferentes distancias utilizadas cuando se aplican clusterng jerárquico, durante este análisis trabajaremos con varias distancias, para ver cuáles son las mejores opciones.
+
+##### 4.2.3.1 Clsutering Jerárquico: Set **Moon** con distancia Euclideana
+
+```{r}
+# Set de datos: Moon
+# Buscamos la distancia
+distancia3 = dist(moon1, method = "euclidean")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia3, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia3, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia3, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia3, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia3, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia3, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia3, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia3, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Puedieron verse las graficas de los dendográmas para el caso de distancia euclideana.
+
+##### 4.2.3.2 Matrices de Confusión del Clsutering Jerárquico: Set **Moon** con distancia Euclideana
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 2)
+table(t1, moon$V3)
+color <- ifelse(t1==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 2)
+table(t2, moon$V3)
+color <- ifelse(t2==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 2)
+table(t3, moon$V3)
+color <- ifelse(t3==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 2)
+table(t4, moon$V3)
+color <- ifelse(t4==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 2)
+table(t5, moon$V3)
+color <- ifelse(t5==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 2)
+table(t6, moon$V3)
+color <- ifelse(t6==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 2)
+table(t7, moon$V3)
+color <- ifelse(t7==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 2)
+table(t8, moon$V3)
+color <- ifelse(t8==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Centroid")
+```
+
+Como se predijo, durante el análisis exploratorio el mejor método para este set de datos es el *Single*, puede verse perfectamente como pudo distingir entre las dos estructuras perfectamente. Para cosos como este es donde se demuestran los lados positivos del método.
+
+##### 4.2.3.3 Clsutering Jerárquico: Set **Moon** con distancia Maximum
+
+```{r}
+# Set de datos: Moon
+# Buscamos la distancia
+distancia3 = dist(moon1, method = "maximum")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia3, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia3, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia3, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia3, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia3, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia3, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia3, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia3, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse la graficación de los diferentes dendográmas.
+
+##### 4.2.3.4 Matrices de Confusión del Clsutering Jerárquico: Set **Moon** con distancia Maximum
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 2)
+table(t1, moon$V3)
+color <- ifelse(t1==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 2)
+table(t2, moon$V3)
+color <- ifelse(t2==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 2)
+table(t3, moon$V3)
+color <- ifelse(t3==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 2)
+table(t4, moon$V3)
+color <- ifelse(t4==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 2)
+table(t5, moon$V3)
+color <- ifelse(t5==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 2)
+table(t6, moon$V3)
+color <- ifelse(t6==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 2)
+table(t7, moon$V3)
+color <- ifelse(t7==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 2)
+table(t8, moon$V3)
+color <- ifelse(t8==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Centroid")
+```
+
+No hubieron muchos cambios con respecto al uso de la distancia euclideana. Nuevamente el mejor método fue el *Single*. 
+
+##### 4.2.3.5 Clsutering Jerárquico: Set **Moon** con distancia Manhattan
+
+```{r}
+# Set de datos: Moon
+# Buscamos la distancia
+distancia3 = dist(moon1, method = "manhattan")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia3, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia3, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia3, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia3, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia3, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia3, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia3, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia3, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse los diferentes gráficos de los dendográmas, pasaremos pues a verificar las soluciones con ayuda de la matriz de confusión.
+
+##### 4.2.3.6 Matrices de Confusión del Clsutering Jerárquico: Set **Moon** con distancia Manhathan
+
+```{r}
+t1=cutree(cluster1, k = 2)
+table(t1, moon$V3)
+color <- ifelse(t1==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 2)
+table(t2, moon$V3)
+color <- ifelse(t2==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 2)
+table(t3, moon$V3)
+color <- ifelse(t3==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 2)
+table(t4, moon$V3)
+color <- ifelse(t4==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 2)
+table(t5, moon$V3)
+color <- ifelse(t5==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 2)
+table(t6, moon$V3)
+color <- ifelse(t6==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 2)
+table(t7, moon$V3)
+color <- ifelse(t7==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 2)
+table(t8, moon$V3)
+color <- ifelse(t8==1, "blueviolet", "deeppink") # Colores
+plot(moon1, col=color, pch=19, main = "Método Centroid")
+```
+
+Análogo a lo que ha venido ocurriendo el mejor m'etodo terminó siendo el *Single*. Así pues queda más que demostrado que para casos donde las estructuras sean alargadas el método que nos provee de las mejores herramientas es el método *Single*. 
+
+
+#### 4.2.4 Clsutering Jerárquico: Set **H**
+
+Lo primero que es importante resaltar son las diferentes distancias utilizadas cuando se aplican clusterng jerárquico, durante este análisis trabajaremos con varias distancias, para ver cuáles son las mejores opciones.
+
+##### 4.2.4.1 Clsutering Jerárquico: Set **H** con distancia Euclideana
+
+```{r}
+# Set de datos: H
+# Buscamos la distancia
+distancia4 = dist(h1, method = "euclidean")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia4, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia4, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia4, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia4, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia4, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia4, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia4, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia4, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Puedieron verse las graficas de los dendográmas para el caso de distancia euclideana.
+
+##### 4.2.4.2 Matrices de Confusión del Clsutering Jerárquico: Set **H** con distancia Euclideana
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 5)
+table(t1, h$V5)
+colors <- sapply(t1, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 5)
+table(t2, h$V5)
+colors <- sapply(t2, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Complete", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 5)
+table(t3, h$V5)
+colors <- sapply(t3, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Average", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 5)
+table(t4, h$V5)
+colors <- sapply(t4, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Ward.D", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 5)
+table(t5, h$V5)
+colors <- sapply(t5, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Ward.D2", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 5)
+table(t6, h$V5)
+colors <- sapply(t6, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método McQuitty", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 5)
+table(t7, h$V5)
+colors <- sapply(t7, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Median", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 5)
+table(t8, h$V5)
+colors <- sapply(t8, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Centroid", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Como puede observarse ningún método puede considerarse como bueno, así pues de entre todos de los menos malos están el de *Wad.D*, cuya matriz de confusión pareciese no ser tan mala. Similar ocurre con el método de *McQuitty*.
+
+##### 4.2.4.3 Clsutering Jerárquico: Set **H** con distancia Maximum
+
+```{r}
+# Set de datos: H
+# Buscamos la distancia
+distancia4 = dist(h1, method = "maximum")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia4, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia4, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia4, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia4, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia4, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia4, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia4, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia4, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse la graficación de los diferentes dendográmas.
+
+##### 4.2.4.4 Matrices de Confusión del Clsutering Jerárquico: Set **H** con distancia Maximum
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 5)
+table(t1, h$V5)
+colors <- sapply(t1, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 5)
+table(t2, h$V5)
+colors <- sapply(t2, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Complete", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 5)
+table(t3, h$V5)
+colors <- sapply(t3, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Average", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 5)
+table(t4, h$V5)
+colors <- sapply(t4, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Ward.D", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 5)
+table(t5, h$V5)
+colors <- sapply(t5, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Ward.D2", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 5)
+table(t6, h$V5)
+colors <- sapply(t6, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método McQuitty", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 5)
+table(t7, h$V5)
+colors <- sapply(t7, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Median", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 5)
+table(t8, h$V5)
+colors <- sapply(t8, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Centroid", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Hubieron algunos casos dónde los métodos empeoraron apreciativamente (ejemplo, método *Centroid*), en otros casos, por otro lado, mejoró bastante. En este punto puede considerarse como el mejor método para tratar con el set de datos el *Ward.D2*, aunque se debe tener en cuenta que la tasa de errores no es despreciable. 
+
+##### 4.2.4.5 Clsutering Jerárquico: Set **H** con distancia Manhattan
+
+```{r}
+# Set de datos: H
+# Buscamos la distancia
+distancia4 = dist(h1, method = "manhattan")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia4, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia4, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia4, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia4, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia4, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia4, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia4, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia4, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse los diferentes gráficos de los dendográmas, pasaremos pues a verificar las soluciones con ayuda de la matriz de confusión.
+
+##### 4.2.4.6 Matrices de Confusión del Clsutering Jerárquico: Set **H** con distancia Manhathan
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 5)
+table(t1, h$V5)
+colors <- sapply(t1, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 5)
+table(t2, h$V5)
+colors <- sapply(t2, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Complete", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 5)
+table(t3, h$V5)
+colors <- sapply(t3, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Average", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 5)
+table(t4, h$V5)
+colors <- sapply(t4, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Ward.D", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 5)
+table(t5, h$V5)
+colors <- sapply(t5, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Ward.D2", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 5)
+table(t6, h$V5)
+colors <- sapply(t6, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método McQuitty", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 5)
+table(t7, h$V5)
+colors <- sapply(t7, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Median", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 5)
+table(t8, h$V5)
+colors <- sapply(t8, def_color)
+h.plot <- scatterplot3d(h$V1,   # x axis
+                        h$V2,   # y axis
+                        h$V3,   # z axis
+                        main="Método Centroid", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Análogo a lo que ha venido ocurriendo, hubieron casos para los que empeoró (de nuevo, método *Centroid*), aunque se resalta que no pareció mejorar apreciativamente para ninguno de los métodos. Así pues se considera hasta este punto que uno de los mejores métodos fue *Ward.D2* con distancia *Maximum*.
+
+#### 4.2.5 Clsutering Jerárquico: Set **HELP**
+
+Lo primero que es importante resaltar son las diferentes distancias utilizadas cuando se aplican clusterng jerárquico, durante este análisis trabajaremos con varias distancias, para ver cuáles son las mejores opciones.
+
+##### 4.2.5.1 Clsutering Jerárquico: Set **HELP** con distancia Euclideana
+
+```{r}
+# Set de datos: HELP
+# Buscamos la distancia
+distancia5 = dist(help1, method = "euclidean")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia5, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia5, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia5, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia5, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia5, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia5, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia5, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia5, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Puedieron verse las graficas de los dendográmas para el caso de distancia euclideana.
+
+##### 4.2.5.2 Matrices de Confusión del Clsutering Jerárquico: Set **HELP** con distancia Euclideana
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 4)
+table(t1, help$V5)
+colors <- sapply(t1, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 4)
+table(t2, help$V5)
+colors <- sapply(t2, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Complete", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 4)
+table(t3, help$V5)
+colors <- sapply(t3, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Avarege", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 4)
+table(t4, help$V5)
+colors <- sapply(t4, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Ward.D", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 4)
+table(t5, help$V5)
+colors <- sapply(t5, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Ward.D2", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 4)
+table(t6, help$V5)
+colors <- sapply(t6, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método McQuitty", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 4)
+table(t7, help$V5)
+colors <- sapply(t7, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Median", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 4)
+table(t8, help$V5)
+colors <- sapply(t8, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Como puede observarse ningún método puede considerarse como bueno, como ya se mencionó con anterioridad se debe a la forma en la que las clases están, si se pudiese separa cada letra como un cluster propio y tal vez separar estos a su vez y trabajar cada estructura por separado el resultado podría ser mejor. 
+
+Si se consiguiese separar cada letra como cluster el ganador indiscutible sería *Single*, pero dada la estructura como es, no se puede recomendar ninguno. La tasa de error siendo tan alta como la de acierto (y en ocaciones incluso más alta) es absurdo.
+
+##### 4.2.5.3 Clsutering Jerárquico: Set **HELP** con distancia Maximum
+
+```{r}
+# Set de datos: HELP
+# Buscamos la distancia
+distancia5 = dist(help1, method = "maximum")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia5, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia5, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia5, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia5, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia5, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia5, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia5, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia5, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse la graficación de los diferentes dendográmas.
+
+##### 4.2.5.4 Matrices de Confusión del Clsutering Jerárquico: Set **HELP** con distancia Maximum
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 4)
+table(t1, help$V5)
+colors <- sapply(t1, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 4)
+table(t2, help$V5)
+colors <- sapply(t2, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Complete", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 4)
+table(t3, help$V5)
+colors <- sapply(t3, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Avarege", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 4)
+table(t4, help$V5)
+colors <- sapply(t4, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Ward.D", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 4)
+table(t5, help$V5)
+colors <- sapply(t5, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Ward.D2", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 4)
+table(t6, help$V5)
+colors <- sapply(t6, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método McQuitty", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 4)
+table(t7, help$V5)
+colors <- sapply(t7, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Median", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 4)
+table(t8, help$V5)
+colors <- sapply(t8, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Como en el caso de la distancia *euclidean*, los resultados obtenido resultan pobres, como ya se mencionó, se mantiene la idea de que una opción para tratar con este set de datos está en convertirlo en set de datos separados y estudiarlos cada uno como una estructura. 
+
+Cabe destacar que para el caso de sitancia *Maximum* los resultados tienden a parecere a los mismos que se obtuvieron por medio del algoritmo *K-Means*, con algunas obvias exepciones (*Single*, por ejemplo).
+
+##### 4.2.5.5 Clsutering Jerárquico: Set **HELP** con distancia Manhattan
+
+```{r}
+# Set de datos: HELP
+# Buscamos la distancia
+distancia5 = dist(help1, method = "manhattan")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia5, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia5, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia5, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia5, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia5, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia5, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia5, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia5, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse los diferentes gráficos de los dendográmas, pasaremos pues a verificar las soluciones con ayuda de la matriz de confusión.
+
+##### 4.2.5.6 Matrices de Confusión del Clsutering Jerárquico: Set **HELP** con distancia Manhathan
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 4)
+table(t1, help$V5)
+colors <- sapply(t1, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 4)
+table(t2, help$V5)
+colors <- sapply(t2, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Complete", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 4)
+table(t3, help$V5)
+colors <- sapply(t3, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Avarege", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 4)
+table(t4, help$V5)
+colors <- sapply(t4, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Ward.D", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 4)
+table(t5, help$V5)
+colors <- sapply(t5, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Ward.D2", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 4)
+table(t6, help$V5)
+colors <- sapply(t6, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método McQuitty", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 4)
+table(t7, help$V5)
+colors <- sapply(t7, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Median", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 4)
+table(t8, help$V5)
+colors <- sapply(t8, def_color)
+h.plot <- scatterplot3d(help$V1,   # x axis
+                        help$V2,   # y axis
+                        help$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Como ha venido ocurriendo, ningun método puede ser considerado como bueno. En ninguno de los casos observados hasta ahora ambas *Ss* fueron incluídas dentro del mismo cluster, sólo con eso se puede llegar a ver cuán grande la tasa de error llega a ser sin necesidad de ver las diferentes matrices de confusión.
+
+Si se pudiese separar el set en tres, sería, posiblemente, mucho más facil de estudiar. Así como está, resultó imposible hayar un método aceptable.
+
+
+
+#### 4.2.6 Clsutering Jerárquico: Set **S**
+
+Lo primero que es importante resaltar son las diferentes distancias utilizadas cuando se aplican clusterng jerárquico, durante este análisis trabajaremos con varias distancias, para ver cuáles son las mejores opciones.
+
+##### 4.2.6.1 Clsutering Jerárquico: Set **S** con distancia Euclideana
+
+```{r}
+# Set de datos: S
+# Buscamos la distancia
+distancia6 = dist(s1, method = "euclidean")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia6, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia6, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia6, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia6, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia6, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia6, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia6, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia6, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Puedieron verse las graficas de los dendográmas para el caso de distancia euclideana.
+
+##### 4.2.6.2 Matrices de Confusión del Clsutering Jerárquico: Set **S** con distancia Euclideana
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 5)
+table(t1, s$V5)
+colors <- sapply(t1, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 5)
+table(t2, s$V5)
+colors <- sapply(t2, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Complete", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 5)
+table(t3, s$V5)
+colors <- sapply(t3, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Avarege", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 5)
+table(t4, s$V5)
+colors <- sapply(t4, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Ward.D", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 5)
+table(t5, s$V5)
+colors <- sapply(t5, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Ward.D2", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 5)
+table(t6, s$V5)
+colors <- sapply(t6, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método McQuitty", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 5)
+table(t7, s$V5)
+colors <- sapply(t7, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Median", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 5)
+table(t8, s$V5)
+colors <- sapply(t8, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+Como puede observarse la *S* representa una estructura algo complicada, se pueden ver algunos resultados no tan malos, por ejmplo, el del método *Avarege*, en el cual algunos de los clusters guardan cierto parecido con la clase original (similar a los métodos *Ward.D* y *Ward.D2* los cuales tampoco están tan mal), al mismo tiempo podemos encontrarnos unos pésimos como el del método *Single*. 
+
+Aunque el resultado optenido aparenta ser mejor que el conseguido mediante *K-Means*.
+
+##### 4.2.6.3 Clsutering Jerárquico: Set **S** con distancia Maximum
+
+```{r}
+# Set de datos: S
+# Buscamos la distancia
+distancia6 = dist(s1, method = "maximum")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia6, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia6, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia6, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia6, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia6, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia6, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia6, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia6, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse la graficación de los diferentes dendográmas cuando la distancia es *Maximum*.
+
+##### 4.2.6.4 Matrices de Confusión del Clsutering Jerárquico: Set **S** con distancia Maximum
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 5)
+table(t1, s$V5)
+colors <- sapply(t1, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 5)
+table(t2, s$V5)
+colors <- sapply(t2, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Complete", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 5)
+table(t3, s$V5)
+colors <- sapply(t3, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Avarege", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 5)
+table(t4, s$V5)
+colors <- sapply(t4, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Ward.D", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 5)
+table(t5, s$V5)
+colors <- sapply(t5, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Ward.D2", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 5)
+table(t6, s$V5)
+colors <- sapply(t6, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método McQuitty", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 5)
+table(t7, s$V5)
+colors <- sapply(t7, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Median", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 5)
+table(t8, s$V5)
+colors <- sapply(t8, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+En algunos casos el cambio en la distancia resultó en uno beneficioso, un ejemplo de esto es el método *Ward.D*, el cual demostró cierta mejora, si bien aún se equivoca, puede considerarse como el mejor de los métodos hasta el momento usados.
+
+##### 4.2.6.5 Clsutering Jerárquico: Set **S** con distancia Manhattan
+
+```{r}
+# Set de datos: S
+# Buscamos la distancia
+distancia6 = dist(s1, method = "manhattan")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia6, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia6, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia6, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia6, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia6, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia6, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia6, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia6, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse los diferentes gráficos de los dendográmas, pasaremos pues a verificar las soluciones con ayuda de la matriz de confusión cuando la distancia es la *Manhattan*.
+
+##### 4.2.6.6 Matrices de Confusión del Clsutering Jerárquico: Set **S** con distancia Manhathan
+
+```{r}
+# Matrices de Confusión 
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 5)
+table(t1, s$V5)
+colors <- sapply(t1, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 5)
+table(t2, s$V5)
+colors <- sapply(t2, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Complete", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 5)
+table(t3, s$V5)
+colors <- sapply(t3, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Avarege", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 5)
+table(t4, s$V5)
+colors <- sapply(t4, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Ward.D", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 5)
+table(t5, s$V5)
+colors <- sapply(t5, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Ward.D2", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 5)
+table(t6, s$V5)
+colors <- sapply(t6, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método McQuitty", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 5)
+table(t7, s$V5)
+colors <- sapply(t7, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Median", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 5)
+table(t8, s$V5)
+colors <- sapply(t8, def_color)
+h.plot <- scatterplot3d(s$V1,   # x axis
+                        s$V2,   # y axis
+                        s$V3,   # z axis
+                        main="Método Single", pch = 20, color = colors, 
+                        angle = 75, scale.y = .5, cex.symbols = 1.5)
+```
+
+En la mayoría de los casos no implico mejoras mencionable o que algo empeorase demasiado. El mejor método puedeconsiderarse como el *Ward.D* con distancia *Maximum*. 
+
+Cabe destacar que esto ocurre en parte debido a la cantidad de clsuters, si se hubiese dividido la clase continua en blosques más grandes es posible que los métodos como *Ward.D* y *Ward.D2* hubiesen hecho un mucho mejor trabajo a la hora de buscar a qué cluster pertenecía cada individuo.
+
+Sería interesante el estudio del mismo set de datos con clases discretas diferentes a las actuales, una reducción en el número, puede ser bueno en este caso si se desea ser menos específico pero aumentar la precisión.
+
+
+#### 4.2.7 Clsutering Jerárquico: Set **Guess**
+
+Lo primero que es importante resaltar son las diferentes distancias utilizadas cuando se aplican clusterng jerárquico, durante este análisis trabajaremos con varias distancias, para ver cuáles son las mejores opciones.
+
+##### 4.2.7.1 Clsutering Jerárquico: Set **Guess** con distancia Euclideana
+
+```{r}
+# Set de datos: Guess
+# Buscamos la distancia
+distancia7 = dist(guess, method = "euclidean")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia7, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia7, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia7, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia7, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia7, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia7, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia7, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia7, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Puedieron verse las graficas de los dendográmas para el caso de distancia euclideana.
+
+##### 4.2.7.2 Graficación del Clsutering Jerárquico: Set **Guess** con distancia Euclideana
+
+```{r}
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 4)
+colors <- sapply(t1, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 4)
+colors <- sapply(t2, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 4)
+colors <- sapply(t3, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 4)
+colors <- sapply(t4, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 4)
+colors <- sapply(t5, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 4)
+colors <- sapply(t6, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 4)
+colors <- sapply(t7, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 4)
+colors <- sapply(t8, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Centroid")
+```
+
+Es interesante ver este set de datos cuando le son aplicados diferentes métodos ya que podemos comenzar a entender la razón de que el códo de Jambú haya indicado que en efecto el óptimo número para este set de datos estab aentre 4~5.
+
+De todos los gráficos mostrados, el que me parece más lógico me parece que es el que vine dado por el método *Ward.D*.
+
+La razón detrás de esto es que me parece que la forma de la nube al aplicarle este método de clustering tiene más sentido desde una perspectiva personal. Así pues, si bien no se puede provar debido a que no se le pueden aplicar métodos predictivos al resultado de la función *hclust*, sería interesante ver cuán bueno es si se pudiese hacer la comparación con *K-Means*.
+
+Se resalta que hasta ahora ninguno de las gráficas generadas tiene parecido con la hecha mediante *K-Means*.
+
+##### 4.2.7.3 Clsutering Jerárquico: Set **Guess** con distancia Maximum
+
+```{r}
+# Set de datos: Guess
+# Buscamos la distancia
+distancia7 = dist(guess, method = "maximum")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia7, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia7, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia7, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia7, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia7, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia7, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia7, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia7, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse la graficación de los diferentes dendográmas cuando la distancia es *Maximum*.
+
+##### 4.2.7.4 Graficación del Clsutering Jerárquico: Set **Guess** con distancia Maximum
+
+```{r}
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 4)
+colors <- sapply(t1, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 4)
+colors <- sapply(t2, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 4)
+colors <- sapply(t3, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 4)
+colors <- sapply(t4, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 4)
+colors <- sapply(t5, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 4)
+colors <- sapply(t6, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 4)
+colors <- sapply(t7, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 4)
+colors <- sapply(t8, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Centroid")
+```
+
+En su momento se habló de que el método que resultaba, personalmente, más atractivo era el *Ward.D*, si se aplica distancia *Maximum* puede verse como el método *Complete* tiende a parecerse al método *Ward.D*, este a su vez no pierde su forma y parece bastante similar, en el caso del método *Ward.D2* ocurre algo similar al de *Complete*.
+
+Cabe destacar que el método *Ward.D*, así como *Ward.D2* funcionan en base de buscar óptimos valores a funciones objetivos, estas funciones tiende a ser el SSE (*Sum of Squared Error*, suma del cuadrado de los errores), como dato interesante esto guarda cierto relación con el método de Jambú el cual también funciona a base de minimizar el SSE.
+
+También se sabe que en el caso de la distancia *Maximum*, ésta funciona bien en casos donde las nubes de punto no estén separadas.
+
+##### 4.2.7.5 Clsutering Jerárquico: Set **S** con distancia Manhattan
+
+```{r}
+# Set de datos: Guess
+# Buscamos la distancia
+distancia7 = dist(guess, method = "manhattan")
+
+# Aplicando hclust
+# Utilizando el método single
+cluster1 = hclust(distancia7, method = "single")
+plot(cluster1, main = "Cluster de Moon: Método Single", col = "blueviolet")
+# Utilizando el método complete
+cluster2 = hclust(distancia7, method = "complete")
+plot(cluster2, main = "Cluster de Moon: Método Complete", col = "blueviolet")
+# Utilizando el método average
+cluster3 = hclust(distancia7, method = "average")
+plot(cluster3, main = "Cluster de Moon: Método Average", col = "blueviolet")
+# Utilizando el método ward.D
+cluster4 = hclust(distancia7, method = "ward.D")
+plot(cluster4, main = "Cluster de Moon: Método Ward.D", col = "blueviolet")
+# Utilizando el método ward.D2
+cluster5 = hclust(distancia7, method = "ward.D2")
+plot(cluster5, main = "Cluster de Moon: Método Ward.D2", col = "blueviolet")
+# Utilizando el método mcquitty
+cluster6 = hclust(distancia7, method = "mcquitty")
+plot(cluster6, main = "Cluster de A: Método Mcquitty", col = "blueviolet")
+# Utilizando el método median
+cluster7 = hclust(distancia7, method = "median")
+plot(cluster7, main = "Cluster de Moon: Método Median", col = "blueviolet")
+# Utilizando el método centroid
+cluster8 = hclust(distancia7, method = "centroid")
+plot(cluster8, main = "Cluster de Moon: Método Centroid", col = "blueviolet")
+```
+
+Pueden verse los diferentes gráficos de los dendográmas, pasaremos pues a verificar las soluciones con ayuda de la matriz de confusión cuando la distancia es la *Manhattan*.
+
+##### 4.2.7.6 Matrices de Confusión del Clsutering Jerárquico: Set **S** con distancia Manhathan
+
+```{r}
+# Matriz de confusión usando el método Single
+t1=cutree(cluster1, k = 4)
+colors <- sapply(t1, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Single")
+# Matriz de confusión usando el método complete
+t2=cutree(cluster2, k = 4)
+colors <- sapply(t2, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Complete")
+# Matriz de confusión usando el método average
+t3=cutree(cluster3, k = 4)
+colors <- sapply(t3, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Average")
+# Matriz de confusión usando el método ward.D
+t4=cutree(cluster4, k = 4)
+colors <- sapply(t4, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Ward.D")
+# Matriz de confusión usando el método ward.D2
+t5=cutree(cluster5, k = 4)
+colors <- sapply(t5, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Ward.D2")
+# Matriz de confusión usando el método mcquitty
+t6=cutree(cluster6, k = 4)
+colors <- sapply(t6, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método McQuitty")
+#Matriz de confusión usando el método median
+t7=cutree(cluster7, k = 4)
+colors <- sapply(t7, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Median")
+#Matriz de confusión usando el método centroid
+t8=cutree(cluster8, k = 4)
+colors <- sapply(t8, def_color)
+plot(x = guess$V1, y = guess$V2,  col = colors, pch = 20, main = "Método Centroid")
+```
+
+Debido a las características de la distancia *Manhathan* es interesante el observar el resultado obtenido luego de aplicar el clustering jerárquico. Más que nada porque con distancias como la *Manhathan* se trata my bien en el caso donde hay datos con outliers (valores atípicos), se puede ver como los gáficos generados con esta distancia son bastante particulares y a lo largo del estudio se ha hecho obvio que en muchos casos no parece ser tan bueno como el uso de sistancias como la *Maximum* la cual como se ha dcho funciona especialmente bien cuando las nubes de puntos estan unidas o la *Euclideana* que es beneficiosa para casos donde los puntos tengan formas elípticas y esten separados su importancia real. Resulta innegable, sin embargo, su importancia (distancia *Manhathan*) debido a la complicaciones que significa trabajar con valores atípicos.
